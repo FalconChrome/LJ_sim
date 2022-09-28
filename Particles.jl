@@ -11,7 +11,7 @@ macro Tnv()
 end
 
 const dt = 1e-3
-const dt² = dt ^ 2
+const dt² = dt^2
 
 function vectorabs2(v::@Tv)::@Tr
     sum(x^2 for x in v)
@@ -29,20 +29,20 @@ end
 const zerovector = zeros(@Tr, 3)
 iszerovector(v::@Tv) = all(iszero, v)
 
-nearest(x::@Tr)::@Tr() = nearest(x, celllen)
+nearest(x::@Tr)::@Tr() = nearest(x, cu½)
 nearest(Δr::@Tv)::@Tv() = nearest.(Δr)
-function nearest(Δx::@Tr, celllen::@Tr)::@Tr
+function nearest(Δx::@Tr, cu½::@Tr)::@Tr
     x = abs(Δx)
-    x <= celllen ? Δx : copysign((x + celllen) % 2celllen - celllen, Δx)
+    x <= cu½ ? Δx : copysign((x + cu½) % 2cu½ - cu½, Δx)
 end
 
 internal(Δr::@Tv)::@Tv() = map(internal, Δr)
-internal(x::@Tr)::@Tr() = internal(x, 2celllen)
-function internal(x::@Tr, cell_size::@Tr)::@Tr
-    if x >= cell_size
-        return x % cell_size
+internal(x::@Tr)::@Tr() = internal(x, cu)
+function internal(x::@Tr, cu::@Tr)::@Tr
+    if x >= cu
+        return x % cu
     elseif x < 0
-        return x % cell_size + cell_size
+        return x % cu + cu
     end
     return x
 end
@@ -55,6 +55,7 @@ function φ2(r2)
     return 0
 end
 φ(r) = φ2(r^2)
+ϕ = φ
 
 function fᵣtrue(Δr::@Tv)::@Tv
     Δr2 = vectorabs2(Δr)
@@ -118,11 +119,12 @@ function iterverle!(p::Number, r_prev::@Tnv, r_cur::@Tnv, r_next::@Tnv,
 end
 
 
-function iterations!(iter!::Function, r::Tuple{@Tnv,@Tnv,@Tnv}, n::Int,
+function iterations!(iter!::Function, r::Tuple{@Tnv,@Tnv,@Tnv}, STEP::UInt,n::Int,
     process::Function, savedata::Vector, iter_args...)
     println(n, " steps:")
     for i = 1:n
         iter!(i / n, r..., iter_args...)
+        STEP += 1
         savedata[i] = process(r[2], r[3])
         r = r[2], r[3], r[1]
         if i % 100 == 0
@@ -146,15 +148,21 @@ countvabs2s(r_prev::@Tnv, r_cur::@Tnv)::@Tv() = broadcast(vectorabs2 ∘ countv,
 countvabss(r_prev::@Tnv, r_cur::@Tnv)::@Tv() = broadcast(vectorabs ∘ countv, r_prev, r_cur)
 
 function potenergy(r::@Tnv)::@Tr
-    sum((φ2 ∘ vectorabs2 ∘ nearest)(rᵢ - rⱼ) for rⱼ in r, rᵢ in r) / 2
+    if isempty(r)
+        return 0
+    end
+    sum((φ2 ∘ vectorabs2 ∘ nearest)(rᵢ - rⱼ) for rⱼ in r, rᵢ in r) / 2 / length(r)
 end
 
 function kinenergy(r_prev::@Tnv, r_cur::@Tnv)::@Tr
-    sum(vectorabs2 ∘ countv, zip(r_prev, r_cur)) / 2
+    if isempty(r_cur)
+        return 0
+    end
+    sum(vectorabs2 ∘ countv, zip(r_prev, r_cur)) / 2 / length(r_cur)
 end
 
 function countvirial(r_prev::@Tnv, r_cur::@Tnv)::@Tr
-    sum(dot(rᵢ, forcesum(rᵢ, r_cur)) for rᵢ in r_cur)
+    sum(dot(rᵢ, forcesum(rᵢ, r_cur)) for rᵢ in r_cur) / length(r_cur)
 end
 
 function countenergy(r_prev::@Tnv, r_cur::@Tnv)::@Tr
