@@ -3,6 +3,8 @@ gr()
 
 @userplot PointsPlot
 @recipe function f(cp::PointsPlot)
+    size --> (960, 720)
+    label --> "Step: $(STEP - i)"
     positions, boundaries = cp.args
     n = length(positions[1])
     linewidth --> 3
@@ -19,34 +21,42 @@ gr()
 end
 
 
-function plotname(N, fps, n, acelllen, v₀, new = nothing)
-    filename_split = ["anim", N, "points", n, acelllen, v₀, "fps", fps]
-    if !isnothing(new)
+function plotname(N, n, cu, T; plot = "plot", fps = "", new = :none, ext = "")
+    if ext != ""
+        ext = "." * ext
+    end
+    filename_split = [plot, N, "points", n, "iter-s", round(cu, digits=3), "σ", T, "ϵ", "fps", fps]
+    if fps == ""
+        filename_split[end-1] = ""
+    end
+    if new != :none
         filename_split[end-1] = new
         insert!(filename_split, 2, 1)
         listdir = readdir()
-        while join(filename_split, ' ') * ".gif" in listdir
+        while join(filename_split, ' ') * ext in listdir
             filename_split[6] += 1
         end
     end
-    join(filename_split, ' ') * ".gif"
+    "Plots/" * join(filename_split, ' ') * ext
 end
 
 
-function plotstates(states; frames = 100, duration = 5, new = nothing)
+function plotstates(states; frames = 100, duration = 5, new = :none)
     positions = [internal(states[i][j][k]) for j = 1:N, k = 1:3, i = 1:n]
-    boundaries = fill((0, 2celllen), 3)
+    boundaries = fill((-0.05cu, 1.05cu), 3)
 
     fps = div(frames, duration)
     if fps > 30
         fps = 30
     end
-    anim = @animate for i ∈ range(1, n, step = div(n, frames))
-        print(i, '/', n, " of anima done")
-        pointsplot(Tuple(positions[:, k, i] for k = 1:3), boundaries)
+    step = div(n, frames)
+    anim = @animate for i ∈ range(1, n, step = step)
+        println(i - 1, '/', n, " of anima done")
+        pointsplot(Tuple(positions[:, k, i] for k = 1:3), boundaries) #, STEP + (n-i) * step)
     end
+    println(n, '/', n, " of anima done")
 
-    filename = plotname(N, fps, n, celllen, v₀, new)
+    filename = plotname(N, n, cu, T, plot = "anima", fps = fps, new = new, ext = "gif")
     gif(anim, filename, fps = fps)
 end
 
